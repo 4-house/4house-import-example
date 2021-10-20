@@ -51,7 +51,7 @@ TEST_ADVERT = {\
 
 
 class ImportExample:
-	"""Example for"""
+	""" Example for """
 
 	@staticmethod
 	def __add_advert(session_id, client, advert):
@@ -78,6 +78,7 @@ class ImportExample:
 
 	def connection(self, client_id, md5_heslo, sw_key):
 		""" Make connection """
+		# pylint: disable=invalid-name
 
 		client = xc.Server(IMPORT_SOFT)
 		getHash = client.getHash(int(client_id))
