@@ -14,7 +14,6 @@ import logging
 
 logging.getLogger().setLevel(logging.INFO)
 
-IMPORT_SOFT = "https://develop-api-impsreality.4.house/RPC2"
 
 TEST_ADVERT = {\
 		'advert_function': 1,\
@@ -47,7 +46,7 @@ TEST_ADVERT = {\
 		'locality_longitude': 14.418540,\
 		'locality_inaccuracy_level': 2,\
 		# nebo 'seller_rkid'
-		'seller_id': 2165}
+		'seller_id': 2973}
 
 
 class ImportExample:
@@ -68,6 +67,13 @@ class ImportExample:
 		print(f'__list_advert(session_id={session_id}) -> response: {response}')
 
 	@staticmethod
+	def __list_seller(session_id, client):
+		""" Print the whole list of sellers """
+
+		response = client.listSeller(session_id)
+		print(f'__list_seller(session_id={session_id}) -> response: {response}')
+
+	@staticmethod
 	def __new_session_id(old_id, password, key):
 		""" new session id """
 
@@ -76,9 +82,15 @@ class ImportExample:
 
 		return old_id[0:48] + var_part.hexdigest()
 
-	def connection(self, client_id, md5_heslo, sw_key):
+	def connection(self, client_id, md5_heslo, sw_key, env):
 		""" Make connection """
 		# pylint: disable=invalid-name
+
+		if env not in ('develop', 'prod'):
+			print(f'Wrond env={env} -> choose: develop or prod')
+			return
+
+		IMPORT_SOFT = "https://%s-api-impsreality.4.house/RPC2" % env
 
 		client = xc.Server(IMPORT_SOFT)
 		getHash = client.getHash(int(client_id))
@@ -90,20 +102,22 @@ class ImportExample:
 
 		session_id = self.__new_session_id(session_id, md5_heslo, sw_key)
 
-		self.__add_advert(session_id, client, TEST_ADVERT)
+		# self.__add_advert(session_id, client, TEST_ADVERT)
 		self.__list_advert(session_id, client)
+		self.__list_seller(session_id, client)
 
 
 if __name__ == '__main__':
 
 	IMPORT_EXAMPLE = ImportExample()
 
-	if len(sys.argv) != 4:
+	if len(sys.argv) != 5:
 		logging.error('Wrong count of input arguments')
-		logging.info('RUN: python3 test_import.py clientId md5_heslo sw_key')
+		logging.info('RUN: python3 test_import.py clientId md5_heslo sw_key env')
 	else:
 		CLIENT_ID = sys.argv[1]  # ID klienta
 		MD5_HESLO = sys.argv[2]  # heslo zakryptovane pres md5
 		SW_KEY = sys.argv[3] # importni klic
+		ENV = sys.argv[4] # env pro napojeni: develop nebo prod
 
-		IMPORT_EXAMPLE.connection(CLIENT_ID, MD5_HESLO, SW_KEY)
+		IMPORT_EXAMPLE.connection(CLIENT_ID, MD5_HESLO, SW_KEY, ENV)
