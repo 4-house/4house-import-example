@@ -25,6 +25,11 @@ TEST_LOCATION_CITYPART = 'Zizkov'
 TEST_LOCATION_CITY = 'Praha'
 TEST_GPS = [50.073658, 14.418540]
 
+#TEST_LOCATION_STREET = ''
+#TEST_LOCATION_CITYPART = ''
+#TEST_LOCATION_CITY = 'Chalkidiki, Řecko'
+#TEST_GPS = [0,0]
+
 # price
 TEST_PRICE_VALUE = 123000
 TEST_PRICE_CURRENCY = 1
@@ -62,6 +67,8 @@ TEST_ADVERT = {\
 	'seller_rkid': TEST_SELLER_RKID,\
 	'seller_id': TEST_SELLER_ID,\
 	#'ready_date':'18.11.2020',\
+	#'ready_date':None,\
+	#'ready_date':'',\
 	'ready_date':'20211111T00:00:00+0000',\
 }
 
@@ -98,7 +105,7 @@ class ImportExample:
 
 		# connect
 		self.__client_id = int(client_id)
-		self.__client = xc.Server(sreality_url)
+		self.__client = xc.Server(sreality_url, allow_none=True)
 
 
 	def __msg(self, msg, msg_type=DEBUG):
