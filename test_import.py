@@ -9,26 +9,60 @@ More info:
 """
 
 # pylint: disable=too-few-public-methods
+import copy
 import time
 import sys
 import hashlib
 import xmlrpc.client as xc
 import logging
 
+NOW = int(time.time())
+
 # seller/agent
+TEST_SELLER = {\
+	'client_login': 'test+sreality-%s@4.house' % NOW,\
+	'client_domain': '4.house',\
+	'client_name': 'Jan Tester',\
+	'contact_gsm': '+420%s' % str(NOW)[-6:],\
+	'client_id': str(NOW)[-9:],\
+	'contact_email': 'test+sreality-%s@4.house' % NOW,\
+	'makler_note': 'Testovani makler test=%s' % NOW,\
+}
 TEST_SELLER_ID = 2973
 TEST_SELLER_RKID = ''
 
 # location
-TEST_LOCATION_STREET = 'Prazska'
-TEST_LOCATION_CITYPART = 'Zizkov'
-TEST_LOCATION_CITY = 'Praha'
-TEST_GPS = [50.073658, 14.418540]
+TEST_LOCATIONS = [\
+	{'city': 'Praha', 'citypart':'Smíchov', 'street':'Radlická 180/50',\
+		'latitude':50.0663614, 'longitude':14.4005557, 'inaccuracy_level':1},\
+	{'city': 'Praha', 'citypart':'Smíchov', 'street':'Radlická 180/50',\
+		'latitude':50.0663614, 'longitude':14.4005557, 'inaccuracy_level':2},\
+	{'city': 'Praha', 'citypart':'Smíchov', 'street':'Radlická 180/50',\
+		'latitude':50.0663614, 'longitude':14.4005557, 'inaccuracy_level':3},\
+	{'city': 'Praha', 'citypart':'Smíchov', 'street':'', 'latitude':50.0663614,\
+		'longitude':14.4005557, 'inaccuracy_level':3},\
+	{'city': 'Barcelona, Španělsko', 'citypart':'', 'street':'', 'latitude':0, 'longitude':0},\
+	{'city': 'Nice, Francie', 'citypart':'', 'street':'', 'latitude':0, 'longitude':0},\
+]
 
-#TEST_LOCATION_STREET = ''
-#TEST_LOCATION_CITYPART = ''
-#TEST_LOCATION_CITY = 'Chalkidiki, Řecko'
-#TEST_GPS = [0,0]
+# advert_function
+# 1 Prodej
+# 2 Pronájem
+# 3 Drazby
+
+# advert_type
+# 1 Byty
+# 2 Domy
+# 3 Pozemky
+# 4 Komercní ˇ
+# 5 Ostatní
+
+TEST_TYPES = [\
+	{'advert_function':1, 'advert_type':1},\
+	{'advert_function':1, 'advert_type':2},\
+	{'advert_function':2, 'advert_type':1},\
+	{'advert_function':2, 'advert_type':2},\
+]
 
 # price
 TEST_PRICE_VALUE = 123000
@@ -55,15 +89,7 @@ TEST_ADVERT = {\
 	'cellar': True,\
 	'heating': (3, 4),\
 	'telecommunication': (1, 2, 4),\
-	"description": "Pekny byt s vyhledem na zahradu.\
-	Pekny byt s vyhledem na zahradu.Pekny byt s vyhledem na zahradu.\
-	Pekny byt s vyhledem na zahradu. test=%s" % int(time.time()),\
-	"locality_city": TEST_LOCATION_CITY,\
-	'locality_citypart': TEST_LOCATION_CITYPART,\
-	'locality_street': TEST_LOCATION_STREET,\
-	'locality_latitude': TEST_GPS[0],\
-	'locality_longitude': TEST_GPS[1],\
-	'locality_inaccuracy_level': 2,\
+	'description': 'Testovací inzerát z importu sreality API',\
 	'seller_rkid': TEST_SELLER_RKID,\
 	'seller_id': TEST_SELLER_ID,\
 	#'ready_date':'18.11.2020',\
@@ -74,7 +100,7 @@ TEST_ADVERT = {\
 
 SREALITY_APIS = {\
 	'prod' : 'https://prod-api-impsreality.4.house/RPC2',\
-	'develop': 'https://develop-api-impsreality.4.house/RPC2'}
+	'develop': 'https://develop-api-impsreality.4house.dev/RPC2'}
 
 
 INFO = 'info'
@@ -85,7 +111,7 @@ ERROR = 'error'
 class ImportExample:
 	""" Example for """
 
-	def __init__(self, env, client_id, md5_passwd, sw_key):
+	def __init__(self, env, client_id, sw_key, md5_passwd):
 		""" init """
 
 		self.env = env
@@ -129,9 +155,10 @@ class ImportExample:
 		return response_type
 
 
+	# --- advert ---
+
 	def __add_advert(self, session_id, advert):
 		""" Add new offer or edit existing one """
-
 		self.__msg('__add_advert(session_id=%s, advert=%s)' % \
 			(session_id, advert), DEBUG)
 
@@ -150,6 +177,8 @@ class ImportExample:
 		return response
 
 
+	# --- seller ---
+
 	def __list_seller(self, session_id):
 		""" Print the whole list of sellers """
 
@@ -158,6 +187,18 @@ class ImportExample:
 			(session_id, response), self.__response_type(response))
 		return response
 
+	def __add_seller(self, session_id, seller):
+		""" add seller """
+		self.__msg('__add_seller(session_id=%s, seller=%s)' % \
+			(session_id, seller), DEBUG)
+
+		response = self.__client.addSeller(session_id, 0, '', seller)
+		self.__msg('__add_seller(session_id=%s, seller=%s) -> response=%s' % \
+			(session_id, seller, response), self.__response_type(response))
+		return response
+
+
+	# -- login ---
 
 	def __new_session_id(self, old_id, passwd, key):
 		""" new session id """
@@ -194,21 +235,73 @@ class ImportExample:
 	def test(self):
 		""" tests """
 
+		rets = []
 		self.__msg('start', INFO)
 
 		# login
 		session_id = self.__login()
 		if not session_id:
 			return False
+		print()
 
-		# tests
+		# add seller
+		seller = self.__add_seller(session_id, TEST_SELLER)
+		rets.append(['addSeller', seller])
 		print()
-		self.__add_advert(session_id, TEST_ADVERT)
+
+		# offers for tests
+		offers = []
+		for locality in TEST_LOCATIONS:
+			offer = copy.deepcopy(TEST_ADVERT)
+			locs = []
+			for key in tuple(locality.keys()):
+				offer['locality_%s' % key] = locality[key]
+				locs.append('%s=%s' % (key, locality[key]))
+
+			offer['description'] = '%s. Localita: %s, test=%s' % \
+				(offer['description'], ', '.join(locs), int(time.time()))
+
+			offer['seller_id'] = seller['output'][0]['seller_id']
+			offer['seller_rkid'] = ''
+			offers.append(offer)
+
+
+		for testtype in TEST_TYPES:
+			offer = copy.deepcopy(TEST_ADVERT)
+
+			locs = []
+			for key in TEST_LOCATIONS[0]:
+				offer['locality_%s' % key] = TEST_LOCATIONS[0][key]
+				locs.append('%s=%s' % (key, TEST_LOCATIONS[0][key]))
+
+			types = []
+			for key in tuple(testtype.keys()):
+				types.append('%s=%s' % (key, testtype[key]))
+
+			offer['description'] = '%s. Localita: %s, Typ: %s, test=%s' % (\
+				offer['description'], ', '.join(locs), ', '.join(types), int(time.time()))
+
+			offer['seller_id'] = seller['output'][0]['seller_id']
+			offer['seller_rkid'] = ''
+
+		# add advert
+		for offer in offers:
+			rets.append(['addAdvert', self.__add_advert(session_id, offer)])
+			print()
+
+		# list advert
+		rets.append(['listAdvert', self.__list_advert(session_id)])
 		print()
-		self.__list_advert(session_id)
+
+		# list seller
+		rets.append(['listSeller', self.__list_seller(session_id)])
 		print()
-		self.__list_seller(session_id)
-		print()
+
+		# summary
+		print('--- Summary --- ')
+		for ret in rets:
+			print('%s: %s %s -> %s' % (ret[0], ret[1].get('status'),\
+				ret[1].get('statusMessage'), ret[1].get('output')))
 
 		self.__msg('finish -> true', INFO)
 		return True
@@ -223,9 +316,9 @@ if __name__ == '__main__':
 		sys.exit(1)
 
 	CLIENT_ID = sys.argv[1]  # ID klienta
-	MD5_PASSWD = sys.argv[2]  # heslo zakryptovane pres md5
-	SW_KEY = sys.argv[3] # importni klic
+	SW_KEY = sys.argv[2] # importni klic
+	MD5_PASSWD = sys.argv[3]  # heslo zakryptovane pres md5
 	ENV = sys.argv[4] # env pro napojeni: develop nebo prod
 
-	IMPORT_EXAMPLE = ImportExample(ENV, CLIENT_ID, MD5_PASSWD, SW_KEY)
+	IMPORT_EXAMPLE = ImportExample(ENV, CLIENT_ID, SW_KEY, MD5_PASSWD,)
 	IMPORT_EXAMPLE.test()
